@@ -4,6 +4,8 @@ import logging
 from openai import OpenAI
 from dotenv import load_dotenv
 from openaigenerator.animalfacts.const import CuteAnimal
+from openaigenerator.animalfacts.imagegen import generate_animal_image
+
 
 # Configure logging
 logging.basicConfig(
@@ -33,6 +35,13 @@ def generate_cute_post():
     ]
 
     try:
+        image_path = generate_animal_image(
+            client=client,
+            animal_name=str(chosen_animal),
+            size="1024x1024",
+            model="gpt-image-1.5",
+        )
+
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=messages,
@@ -43,7 +52,7 @@ def generate_cute_post():
 
         logging.info(f"Chosen animal: {chosen_animal}")
         logging.info(f"Generated post: {output}")
-        return chosen_animal, output
+        return chosen_animal, output, image_path
 
     except Exception as e:
         logging.error(f"Failed to generate content: {e}")
