@@ -19,7 +19,11 @@ def _normalize_animal(text: str) -> str | None:
     if not text:
         return None
 
-    line = text.strip().splitlines()[0].strip()
+    stripped = text.strip()
+    if not stripped:
+        return None
+
+    line = stripped.splitlines()[0].strip()
     line = line.strip("\"'`")
     line = re.split(r"[,/;]|\bor\b|\band\b", line, maxsplit=1, flags=re.IGNORECASE)[0]
     line = re.sub(r"[^a-zA-Z \-]", "", line)
