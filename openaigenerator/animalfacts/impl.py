@@ -1,6 +1,7 @@
 import os
 import random
 import logging
+import re
 from openai import OpenAI
 from dotenv import load_dotenv
 from openaigenerator.animalfacts.const import CuteAnimal
@@ -14,13 +15,72 @@ logging.basicConfig(
 )
 
 
+def _normalize_animal(text: str) -> str | None:
+    if not text:
+        return None
+
+    line = text.strip().splitlines()[0].strip()
+    line = line.strip("\"'`")
+    line = re.split(r"[,/;]|\bor\b|\band\b", line, maxsplit=1, flags=re.IGNORECASE)[0]
+    line = re.sub(r"[^a-zA-Z \-]", "", line)
+    line = re.sub(r"\s+", " ", line).strip()
+    line = re.sub(r"^(a|an|the) ", "", line, flags=re.IGNORECASE).strip()
+
+    return line.lower() or None
+
+
+def generate_random_animal(client: OpenAI) -> str | None:
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You return a single random real animal name. "
+                "Return only the animal name, no punctuation, no quotes."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                "Pick one random real animal (cute or friendly). "
+                "Return only the animal name."
+            ),
+        },
+    ]
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+            temperature=1.2,
+            max_tokens=20,
+        )
+        raw = response.choices[0].message.content or ""
+    except Exception as e:
+        logging.error(f"Failed to generate random animal: {e}")
+        return None
+
+    animal = _normalize_animal(raw)
+    if not animal:
+        logging.warning("Random animal response was empty after normalization.")
+        return None
+
+    if len(animal) > 40:
+        logging.warning("Random animal response too long: %s", animal)
+        return None
+
+    return animal
+
+
 def generate_cute_post():
     # Load environment variables
     load_dotenv()
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    # Pick a random cute animal
-    chosen_animal = random.choice(CuteAnimal.list())
+    # Pick a random animal via OpenAI, with a local fallback for safety
+    chosen_animal = generate_random_animal(client)
+    if not chosen_animal:
+        chosen_animal = random.choice(CuteAnimal.list())
+        logging.warning("Falling back to local animal list.")
 
     # Prompt for social-media-friendly text
     prompt = (
@@ -56,6 +116,7 @@ def generate_cute_post():
 
     except Exception as e:
         logging.error(f"Failed to generate content: {e}")
+
 
 if __name__ == "__main__":
     generate_cute_post()
